@@ -9,10 +9,13 @@
 // Retreieval). It should not be used or distributed without consent by the author. 
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-
+#include <iostream>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
+#include <map>
+#include <vector>
+#include <algorithm>
 
 #include "IInvFile.h"
 
@@ -418,7 +421,7 @@ void IInvFile::PrintTop(RetRec * r, int top) {
 
 // Perform retrieval
 //mode 0 for normal search, 1 for trec
-void IInvFile::Search(char * q,int mode,int qid) {
+RetRec * IInvFile::Search(char * q,int mode,int qid) {
 	char * s = q;
 	char * w;
 	bool next = true;
@@ -440,19 +443,26 @@ void IInvFile::Search(char * q,int mode,int qid) {
 			else if (strlen(w) > 0) printf("Query term does not exist <%s>\r\n",w);
 		}
 	} while (next == true);				// More query terms to handle?
-	normalize(result,qsize);
-	PrintTop(result, 10);				// Print top 10 retrieved results
-	if(mode==1)PrintTREC(result,qid);
+	normalize(result,qsize);			// Print top 10 retrieved results
+	PrintTop(result, 10);
+	if(mode==1){PrintTREC(result,qid);}
+	return result;
 }
 
 // Interactive retrieval
 void IInvFile::Retrieval() {
 	bool next = true;
 	char cmd[10000];
-	do {	printf("Type the query or type \"_batch\" for TREC file input or \"_quit\" to exit\r\n");
+	do {	printf("First Approach\nType the query or type \"_second\" for second approach\nType the query or type \"_batch\" for TREC file input or \"_quit\" to exit\r\n");
 		gets(cmd);
 		if (strcmp(cmd,"_quit") == 0) next = false;
 		else if(strcmp(cmd,"_batch")==0) {printf("Type file path: (e.g. ./teach/comp433/2005b/assign/Query/queryT)\n");gets(cmd);OutputTREC(cmd);}
+		else if(strcmp(cmd,"_second")==0) {printf("Second Approach\nType the query or type \"_batch\" for TREC file input or \"_quit\" to exit\r\n");
+		gets(cmd);
+		if (strcmp(cmd,"_quit") == 0) next = false;
+		else if(strcmp(cmd,"_batch")==0) {printf("Type file path: (e.g. ./teach/comp433/2005b/assign/Query/queryT)\n");gets(cmd);secondApproachTREC(cmd);}
+		else secondApproach(cmd,0,0);
+		}
 		else Search(cmd,0,0);
 	} while (next == true);
 
@@ -512,4 +522,97 @@ void IInvFile::normalize(RetRec *r,float qsize){
 		if(r[i].sim==0.0){break;}
 		r[i].sim = r[i].sim/Files[docid].len/qlen;
 	}
+}
+//change the number of iteration from here
+void IInvFile::secondApproach(char* q,int mode,int QID) {
+	if(mode==0)secondApproachRead("FormattedFile.txt");
+    RetRec* res;
+    for (int i = 0; i <=6; i++) {
+		if(mode==1 &&i==6){res = Search(q, 1, QID);}
+        else res= Search(q, 2, 0);
+        vector<string> resVec = secondApproachAlgo(res);
+        for (const auto& str : resVec) {
+            std::string tempStr = std::string(q) + " " + str;
+            strcpy(q, tempStr.c_str());
+        }
+    }
+	
+}
+
+void IInvFile::secondApproachTREC(char* f) {
+    int docid,len;
+	char line[10000];char str[1000]; char TRECID[1000];
+	int QID;
+	char query[10000];
+	FILE * fp1=fopen("TREC.txt","wb");
+	if(fp1==NULL){printf("Error:no file <%s>",f);return;}
+	fclose(fp1);
+	FILE * fp=fopen(f,"rb");
+	if(fp==NULL){printf("Error:no file <%s>",f);return;}
+	secondApproachRead("FormattedFile.txt");
+	while (fgets(line,10000,fp) != NULL) {
+		sscanf(line,"%d %s", &QID,&query);
+		secondApproach(query,1,QID);
+	}
+	fclose(fp);
+}
+//change here if you wanted to add more stem to be query for each iteration
+vector<string> IInvFile::secondApproachAlgo(RetRec * res){
+	map<string,int> ctable;
+	for(int i=0;i<3;i++){
+		for(auto u: Stemtable[res[i].docid]){
+			if (ctable[u.first]!=0)ctable[u.first]=u.second;
+			else ctable[u.first] += u.second;
+		}
+	}
+	std::vector<std::string> stringsWithHighestInts;
+    for (const auto& pair : ctable) {
+        stringsWithHighestInts.push_back(pair.first);
+        if (stringsWithHighestInts.size() > 10) {
+            auto minElement = std::min_element(stringsWithHighestInts.begin(), stringsWithHighestInts.end(),
+                [&](const std::string& a, const std::string& b) {
+                    return ctable[a] < ctable[b];
+                }
+            );
+            stringsWithHighestInts.erase(minElement);
+        }
+    }
+	return stringsWithHighestInts;
+}
+
+void IInvFile::secondApproachRead(char* q) {
+    FILE* file = fopen("FormattedFile.txt", "r");
+    if (file == NULL) {
+        printf("Failed to open the file.\n");
+        return;
+    }
+
+    char line[1000];
+    char stem[1000];
+    int docid, occurrence;
+
+    int currentDocID = -1;
+	char* token;
+
+    while (fgets(line, 1000, file) != NULL) {
+        int docid;
+        char* pairToken = strtok(line, ":");
+        if (pairToken != NULL) {
+            // Extract the docid from the first token
+            docid = atoi(pairToken);
+        }
+
+        // Process the rest of the tokens which contain "stem occurrence" pairs
+        while ((token = strtok(NULL, ",")) != NULL) {
+            // Extract the stem and occurrence from the token
+            char stem[1000];
+            int occurrence;
+            if (sscanf(token, " %s %d", stem, &occurrence) == 2) {
+                // Update Stemtable with the extracted data
+				Stemtable[docid].insert(make_pair(stem,occurrence));
+            }
+        }
+    }
+
+    fclose(file);
 }

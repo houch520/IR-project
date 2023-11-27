@@ -13,11 +13,14 @@
 
 #ifndef _IINVFILE_
 #define _IINVFIEL_
-
+#include <iostream>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
 #include<math.h>
+#include <map>
+#include <algorithm>
+#include <vector>
 
 #include "stem.h"
 
@@ -88,12 +91,19 @@ public:
 	void CombineResult(RetRec * r, post * p, float idf);	// Combine the partial retrieval results
 	stemmer Stemming;					// Stemmer
 	char * GotoNextWord(char * s);				// Delimit the next query term
-	void Search(char * q,int mode,int qid);					// Search one query
+	RetRec* Search(char * q,int mode,int qid);					// Search one query
 	void Retrieval();					// Interactive retrieval
 	void ReadTRECID(char *f);
     void OutputTREC(char *f);
     void PrintTREC(RetRec * r,int qid);
-    void normalize(RetRec *r,float qsize);
+    void normalize(RetRec *r,float);
+
+    void secondApproach(char * q,int mode,int QID);
+    void secondApproachTREC(char * f);
+    void secondApproachRead(char * q);
+
+    vector<string> secondApproachAlgo(RetRec * res);
+    map <int,map<string,int>> Stemtable;
 };
 
 
