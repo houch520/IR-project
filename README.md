@@ -4,6 +4,7 @@ Need to download it by yourself (file too large)
 IRProj/post.zip
 IRProj/data/post1.txt
 
+FormattedFile.exe should be run too if formattedfile.txt doesn't exist
 if not exist please compile it by command in compile
 Then run BuildInvFile.exe, Retrieval.exe
 follow instruction
